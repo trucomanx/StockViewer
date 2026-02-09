@@ -1,10 +1,17 @@
 #!/usr/bin/python3
 
 '''
-python3 -m venv venv-stock-viewer
-source venv-stock-viewer/bin/activate
-
+## ubuntu ##
+python3 -m venv venv-temporal
+source venv-temporal/bin/activate
 pip install --upgrade pip
+
+## windows ##
+python -m venv venv-temporal
+venv-temporal\Scripts\activate
+python -m pip install --upgrade pip
+
+
 pip install pyinstaller pyinstaller-hooks-contrib
 pip install -r requirements.txt
 cd src

@@ -8,11 +8,12 @@ import signal
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QLabel, QComboBox, QTableWidget, QProgressBar, 
     QTableWidgetItem, QWidget, QPushButton, QLineEdit, QFileDialog, QHBoxLayout, 
-    QTabWidget, QFormLayout, QSplitter, QMenu, QSizePolicy
+    QTabWidget, QFormLayout, QSplitter, QMenu, QSizePolicy,
+    QDialog, QTextEdit, QDialogButtonBox, QVBoxLayout
 )
 
 from PyQt5.QtGui  import QColor, QIcon, QFont, QDesktopServices
-from PyQt5.QtCore import Qt, QUrl, QSize, QTimer
+from PyQt5.QtCore import Qt, QUrl, QSize, QTimer, QDateTime
 
 import pyqtgraph as pg
 import numpy as np
@@ -71,16 +72,21 @@ DEFAULT_TABLE_CONTENT={
 }
 
 DEFAULT_PROGRAM_CONTENT={ 
+    "gpt_annotation": "Quero que você analise minha carteira descrita no JSON. Meu estilo de investir é 'buy and hold'. Se for para vender, prefiro esperar até que o preço suba e perder pouco, ou se o preço está baixo, posso fazer 'average down'. Quero que você me diga, de forma assertiva e concisa, se devo comprar, vender ou manter quais ações e por quê.",
+    "button_update": "To update",
+    "button_update_tooltip": "To update in the program the quantities and average prices from a JSON file.",
+    "button_save": "Save",
+    "button_save_tooltip": "Save the quantity and average prices in a JSON file",
+    "button_save_as_plus": "Save As (+)",
+    "button_save_as_plus_tooltip": "Save rich stocks data to another JSON file.",
+    "button_gpt_annotation": "GPT annot.",
+    "button_gpt_annotation_tooltip": "Annotations to be used in GPT chats when send our json info",
     "button_performance": "P. plot",
     "button_performance_tooltip": "Plot of performance",
     "button_groupplot": "G. plot",
     "button_groupplot_tooltip": "Plot of amount by group",
     "button_prog_configure": "Settings",
     "button_prog_configure_tooltip": "Open the configure Json file of program",  
-    "button_update": "To update",
-    "button_update_tooltip": "To update in the program the quantities and average prices from a JSON file.",
-    "button_save": "Save",
-    "button_save_tooltip": "Save the quantity and average prices in a JSON file",
     "button_coffee": "Coffee",
     "button_coffee_tooltip": "Buy me a coffee (TrucomanX)",
     "button_about": "About",
@@ -132,6 +138,9 @@ configure.verify_default_config(DEFAULT_TABLE_CONFIG_PATH, default_content=DEFAU
 configure.verify_default_config(PROGRAM_CONFIG_PATH      , default_content=DEFAULT_PROGRAM_CONTENT)
 
 CONFIG=configure.load_config(PROGRAM_CONFIG_PATH)
+
+################################################################################
+   
 
 def show_bar_plot_hor(labels, values, title="", color = "blue"):
     w = pg.plot()
@@ -534,6 +543,23 @@ class StocksViewer(QMainWindow):
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         buttons_layout.addWidget(spacer)
+        
+        # Botão Save As
+        self.save_as_button = QPushButton(CONFIG["button_save_as_plus"], self)
+        self.save_as_button.setToolTip(CONFIG["button_save_as_plus_tooltip"])
+        self.save_as_button.setIcon(QIcon.fromTheme("document-save-as"))
+        self.save_as_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
+        self.save_as_button.clicked.connect(self.save_data_as_plus)
+        self.save_as_button.setEnabled(False)
+        buttons_layout.addWidget(self.save_as_button)
+
+        # Botão GPT annot.
+        self.gpt_annot_button = QPushButton(CONFIG["button_gpt_annotation"], self)
+        self.gpt_annot_button.setToolTip(CONFIG["button_gpt_annotation_tooltip"])
+        self.gpt_annot_button.setIcon(QIcon.fromTheme("text-x-generic"))  # ícone opcional
+        self.gpt_annot_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
+        self.gpt_annot_button.clicked.connect(self.gpt_annot_callback)  # texto inicial
+        buttons_layout.addWidget(self.gpt_annot_button)
 
         # Group plot
         self.performance_button = QPushButton(CONFIG["button_performance"], self)
@@ -672,6 +698,127 @@ class StocksViewer(QMainWindow):
         layout.addRow('', self.update_config_button)
 
         self.config_tab.setLayout(layout)
+
+    def save_data_as_plus(self):
+        # Diálogo Save As
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save rich stocks data as",
+            "",
+            "Stocks Report JSON (*.stocks.report.json)"
+        )
+
+        if not path:
+            return
+
+        # garante extensão
+        if not path.endswith(".stocks.report.json"):
+            path += ".stocks.report.json"
+
+        self._save_rich_stocks_to_path(path)
+
+    def show_gpt_annotation_dialog(self, text="Oi"):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("GPT Annotation")
+        dialog.setMinimumSize(600, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Campo de texto somente leitura
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setPlainText(text)
+        text_edit.setFont(QFont("Consolas", 11))  # fonte monoespaçada fica melhor para JSON
+        layout.addWidget(text_edit)
+        
+        # Botões OK + Copy
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok)
+        
+        copy_button = QPushButton("Copy to Clipboard")
+        copy_button.setIcon(QIcon.fromTheme("edit-copy"))
+        copy_button.clicked.connect(lambda: QApplication.clipboard().setText(text_edit.toPlainText()))
+        
+        button_box.addButton(copy_button, QDialogButtonBox.ActionRole)
+        button_box.accepted.connect(dialog.accept)
+        
+        layout.addWidget(button_box)
+        
+        dialog.exec_()
+        
+    def gpt_annot_callback(self):
+        self.show_gpt_annotation_dialog(CONFIG["gpt_annotation"])
+        
+        
+    def _save_rich_stocks_to_path(self, path):
+        import re
+
+        def sanitize(obj):
+            if isinstance(obj, dict):
+                return {k: sanitize(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [sanitize(v) for v in obj]
+            elif hasattr(obj, "tolist"):
+                return obj.tolist()
+            return obj
+        
+        def round_floats(obj, ndigits=4):
+            if isinstance(obj, dict):
+                return {k: round_floats(v, ndigits) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [round_floats(v, ndigits) for v in obj]
+            elif isinstance(obj, float):
+                return round(obj, ndigits)
+            return obj
+
+        rich_data = sanitize(self.stocks_data)
+
+        # =============================================
+        # Cálculo dos totais do portfólio inteiro
+        # =============================================
+        total_initial = 0.0
+        total_current = 0.0
+
+        for stock_name, stock in rich_data.items():
+            qty = stock.get('quantity', 0)
+            avg_price = stock.get('average_price', 0)
+            curr_price = stock.get('currentPrice', 0)
+
+            total_initial += qty * avg_price
+            total_current += qty * curr_price
+
+        # =============================================
+        # Monta o payload com os novos campos no meta
+        # =============================================
+        payload = {
+            "meta": {
+                "program": about.__program_name__,
+                "version": about.__version__,
+                "generated_at": QDateTime.currentDateTime().toString(Qt.ISODate),
+                "total_initial_amount": round(total_initial, 2),     # ← novo
+                "total_current_amount": round(total_current, 2)      # ← novo
+            },
+            "stocks": rich_data
+        }
+
+        payload = round_floats(payload, ndigits=4)
+        
+        # Primeiro salvar com indentação
+        json_str = json.dumps(payload, indent=1, ensure_ascii=False)
+        
+        # Regex para compactar listas de números em uma linha
+        # Procura por arrays que contêm apenas números
+        def compact_numeric_arrays(match):
+            content = match.group(1)
+            # Remove quebras de linha e espaços extras
+            compacted = re.sub(r'\s+', ' ', content)
+            return '[' + compacted.strip() + ']'
+        
+        # Padrão para encontrar arrays de números com quebras de linha
+        pattern = r'\[\s*\n\s*((?:[-\d.]+(?:,\s*\n\s*)?)+)\s*\n\s*\]'
+        json_str = re.sub(pattern, compact_numeric_arrays, json_str)
+        
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(json_str)
 
     def on_performance_click(self):
     
@@ -849,6 +996,7 @@ class StocksViewer(QMainWindow):
             self.setEnabled(True)
             self.groupplot_button.setEnabled(True)
             self.performance_button.setEnabled(True)
+            self.save_as_button.setEnabled(True)
 
 
     def update_table_columns(self):
