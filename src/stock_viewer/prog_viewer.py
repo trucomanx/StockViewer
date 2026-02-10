@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
 import os
+import re
 import sys
 import json
+import copy
 import signal
 
 from PyQt5.QtWidgets import (
@@ -72,7 +74,8 @@ DEFAULT_TABLE_CONTENT={
 }
 
 DEFAULT_PROGRAM_CONTENT={ 
-    "gpt_annotation": "Quero que você analise minha carteira descrita no JSON. Meu estilo de investir é 'buy and hold'. Se for para vender, prefiro esperar até que o preço suba e perder pouco, ou se o preço está baixo, posso fazer 'average down'. Quero que você me diga, de forma assertiva e concisa, se devo comprar, vender ou manter quais ações e por quê.",
+    "gpt_annotation": "Quero que você analise minha carteira descrita no JSON. Meu estilo de investir é 'buy and hold'. Se for para vender, prefiro esperar até que o preço suba e perder pouco, ou se o preço está baixo, posso fazer 'average down'. Quero que você me diga, de forma assertiva e concisa, se devo comprar, vender ou manter quais ações e por quê. Usando os dados fornecidos, faça uma análise fundamentalista e uma análise técnica/gráfica para tomar suas decisões de compra, venda e manter. Se for necessário, procure informações que você precise na internet. Atualmente, tenho as seguintes ações: ",
+    "gpt_stock_prompt": "Quero que você analise minha ação. Meu estilo de investir é 'buy and hold'. Se for para vender, prefiro esperar até que o preço suba e perder pouco, ou se o preço está baixo e é necessário, posso fazer 'average down'. Quero que você me diga, de forma assertiva e concisa, se devo comprar, vender ou manter esta ação e por quê. Usando os dados fornecidos, faça uma análise fundamentalista e uma análise técnica/gráfica para tomar suas decisões de compra, venda e manter. Se for necessário, procure informações que você precise na internet. Atualmente, tenho as seguintes informações: ",
     "button_update": "To update",
     "button_update_tooltip": "To update in the program the quantities and average prices from a JSON file.",
     "button_save": "Save",
@@ -123,6 +126,7 @@ DEFAULT_PROGRAM_CONTENT={
     "green_color": "#d3ffc7",
     "red_color": "#ffc9d6",
     "search_yahoo": "Search Yahoo finance",
+    "get_stock_prompt": "Get prompt of",
     "search_google": "Search Google",
     "copy_cell": "Copy cell", 
     "plot_color": "blue", 
@@ -717,9 +721,9 @@ class StocksViewer(QMainWindow):
 
         self._save_rich_stocks_to_path(path)
 
-    def show_gpt_annotation_dialog(self, text="Oi"):
+    def show_annotation_dialog(self, text="Oi", title="GPT Annotation"):
         dialog = QDialog(self)
-        dialog.setWindowTitle("GPT Annotation")
+        dialog.setWindowTitle(title)
         dialog.setMinimumSize(600, 400)
         
         layout = QVBoxLayout(dialog)
@@ -746,31 +750,38 @@ class StocksViewer(QMainWindow):
         dialog.exec_()
         
     def gpt_annot_callback(self):
-        self.show_gpt_annotation_dialog(CONFIG["gpt_annotation"])
+        tickers = ", ".join(self.stocks_data.keys())
+        self.show_annotation_dialog(CONFIG["gpt_annotation"]+tickers)
         
-        
+    def compact_numeric_arrays(self,match):
+        # Regex para compactar listas de números em uma linha
+        # Procura por arrays que contêm apenas números
+        content = match.group(1)
+        # Remove quebras de linha e espaços extras
+        compacted = re.sub(r'\s+', ' ', content)
+        return '[' + compacted.strip() + ']'
+
+    def sanitize(self, obj):
+        if isinstance(obj, dict):
+            return {k: self.sanitize(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self.sanitize(v) for v in obj]
+        elif hasattr(obj, "tolist"):
+            return obj.tolist()
+        return obj
+
+    def round_floats(self, obj, ndigits=4):
+        if isinstance(obj, dict):
+            return {k: self.round_floats(v, ndigits) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self.round_floats(v, ndigits) for v in obj]
+        elif isinstance(obj, float):
+            return round(obj, ndigits)
+        return obj
+
     def _save_rich_stocks_to_path(self, path):
-        import re
 
-        def sanitize(obj):
-            if isinstance(obj, dict):
-                return {k: sanitize(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [sanitize(v) for v in obj]
-            elif hasattr(obj, "tolist"):
-                return obj.tolist()
-            return obj
-        
-        def round_floats(obj, ndigits=4):
-            if isinstance(obj, dict):
-                return {k: round_floats(v, ndigits) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [round_floats(v, ndigits) for v in obj]
-            elif isinstance(obj, float):
-                return round(obj, ndigits)
-            return obj
-
-        rich_data = sanitize(self.stocks_data)
+        rich_data = self.sanitize(copy.deepcopy(self.stocks_data))
 
         # =============================================
         # Cálculo dos totais do portfólio inteiro
@@ -800,22 +811,14 @@ class StocksViewer(QMainWindow):
             "stocks": rich_data
         }
 
-        payload = round_floats(payload, ndigits=4)
+        payload = self.round_floats(payload, ndigits=4)
         
         # Primeiro salvar com indentação
         json_str = json.dumps(payload, indent=1, ensure_ascii=False)
         
-        # Regex para compactar listas de números em uma linha
-        # Procura por arrays que contêm apenas números
-        def compact_numeric_arrays(match):
-            content = match.group(1)
-            # Remove quebras de linha e espaços extras
-            compacted = re.sub(r'\s+', ' ', content)
-            return '[' + compacted.strip() + ']'
-        
         # Padrão para encontrar arrays de números com quebras de linha
         pattern = r'\[\s*\n\s*((?:[-\d.]+(?:,\s*\n\s*)?)+)\s*\n\s*\]'
-        json_str = re.sub(pattern, compact_numeric_arrays, json_str)
+        json_str = re.sub(pattern, self.compact_numeric_arrays, json_str)
         
         with open(path, "w", encoding="utf-8") as f:
             f.write(json_str)
@@ -1386,9 +1389,31 @@ class StocksViewer(QMainWindow):
                 )
             )
         
+        # --- Ia prompt ---
+        if stock_name:
+            get_stock_prompt = menu.addAction(CONFIG["get_stock_prompt"]+f": {stock_name}")
+            get_stock_prompt.triggered.connect( lambda: self.gpt_stock_prompt(stock_name) )
+        
+        
         # mostra o menu na posição correta
         global_pos = self.tableWidget.viewport().mapToGlobal(pos)
         menu.exec_(global_pos)
+        
+    def gpt_stock_prompt(self, stock_name):
+        
+        rich_data = self.sanitize(copy.deepcopy(self.stocks_data[stock_name]) )
+        rich_data = self.round_floats(rich_data, ndigits=4)
+        json_str = json.dumps(rich_data, indent=1, ensure_ascii=False)
+        
+        # Padrão para encontrar arrays de números com quebras de linha
+        pattern = r'\[\s*\n\s*((?:[-\d.]+(?:,\s*\n\s*)?)+)\s*\n\s*\]'
+        json_str = re.sub(pattern, self.compact_numeric_arrays, json_str)
+        
+        msg  = CONFIG["gpt_stock_prompt"] + "\n"
+        msg += "\""+stock_name + "\":\n"
+        msg += json_str
+        
+        self.show_annotation_dialog(msg,title=stock_name)
 
     def recompute_current_group_total(self):
         group_name = self.comboBox.currentText()
