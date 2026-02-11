@@ -13,13 +13,16 @@ import os
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QApplication
 
+import stock_viewer.modules.investing_com as investing_com
+
+
 temp_dir = tempfile.gettempdir()
 yf.set_tz_cache_location(os.path.join(temp_dir, "yf_cache"))
 
 # ---------------- PRICE HISTORY ---------------- #
 
 def price_hist(stock, period="6mo", interval="1d"):
-    for p in [period, "5d"]:
+    for p in [period]:
         try:
             hist = stock.history(period=p, interval="1d")
 
@@ -32,11 +35,24 @@ def price_hist(stock, period="6mo", interval="1d"):
                 prices = hist["Close"].dropna().tolist()
 
             if prices:
+                if len(prices)<=2 and interval=="1d" and period=="1mo":
+                    ticker = getattr(stock, "ticker", "N/A")
+                    print("investing_com",ticker)
+                    res = investing_com.get_etf_history_1mo(ticker)
+                    if len(res)>2:
+                        return res
                 return prices
 
         except Exception:
             continue
 
+    if interval=="1d" and period=="1mo":
+        ticker = getattr(stock, "ticker", "N/A")
+        print("investing_com",stock)
+        res = investing_com.get_etf_history_1mo(ticker)
+        if len(res)>2:
+            return res
+    
     return []
 
 # ---------------- CURRENT PRICE ---------------- #

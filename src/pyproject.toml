@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock_viewer"
-version = "0.1.17"
+version = "0.1.19"
 description = "Simple stock viewer program."
 readme = "README.md"
 authors = [{name = "Fernando Pujaico Rivera", email = "fernando.pujaico.rivera@gmail.com"}]
@@ -20,8 +20,7 @@ keywords = ["writing", "translate"]
 dependencies = [
     "PyQt5",
     "yfinance",
-    "pyqtgraph",
-    "numpy"
+    "pyqtgraph"
 ]
 
 [project.urls]

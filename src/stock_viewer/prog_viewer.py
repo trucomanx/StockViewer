@@ -74,8 +74,8 @@ DEFAULT_TABLE_CONTENT={
 }
 
 DEFAULT_PROGRAM_CONTENT={ 
-    "gpt_annotation": "Quero que você analise minha carteira descrita no JSON. Meu estilo de investir é 'buy and hold'. Se for para vender, prefiro esperar até que o preço suba e perder pouco, ou se o preço está baixo, posso fazer 'average down'. Quero que você me diga, de forma assertiva e concisa, se devo comprar, vender ou manter quais ações e por quê. Usando os dados fornecidos, faça uma análise fundamentalista e uma análise técnica/gráfica para tomar suas decisões de compra, venda e manter. Se for necessário, procure informações que você precise na internet. Atualmente, tenho as seguintes ações: ",
-    "gpt_stock_prompt": "Quero que você analise minha ação. Meu estilo de investir é 'buy and hold'. Se for para vender, prefiro esperar até que o preço suba e perder pouco, ou se o preço está baixo e é necessário, posso fazer 'average down'. Quero que você me diga, de forma assertiva e concisa, se devo comprar, vender ou manter esta ação e por quê. Usando os dados fornecidos, faça uma análise fundamentalista e uma análise técnica/gráfica para tomar suas decisões de compra, venda e manter. Se for necessário, procure informações que você precise na internet. Atualmente, tenho as seguintes informações: ",
+    "gpt_annotation": "Quero que você analise minha carteira de ações, descrita no JSON fornecido. \nMeu estilo de investir é buy and hold, com foco em longo prazo. \nAjustes de posição devem ser sempre graduais, nunca assumindo compra ou venda total, a menos que eu diga explicitamente. \nSe for para comprar mais, indique claramente quanto aumentar da posição atual, usando uma porcentagem objetiva (ex: +5%, +10%, +20%). As porcentagens sempre se referem à posição atual da ação, e não ao capital total da carteira. \nSe for para vender, indique quanto reduzir da posição atual, também em porcentagem. \nSe a melhor decisão for manter, deixe explícito que nenhum ajuste é recomendado no momento. As porcentagens indicadas devem refletir convicção no longo prazo e risco relativo do preço atual frente aos fundamentos. \nEm cenários de queda com bons fundamentos, aceito fazer average down. \nQuero que você me diga, de forma assertiva e concisa, quais ações da carteira devo comprar mais, manter, reduzir ou vender, no longo prazo, explicando claramente o porquê de cada decisão. \nUsando exclusivamente os dados fornecidos, faça: \n* uma análise fundamentalista de cada ativo, e \n* uma análise técnica estrutural de longo prazo, baseada apenas em preços de fechamento (close) e no timeframe informado no campo meta.timeframe no JSON, sem assumir dados de abertura, máxima, mínima ou volume. \nCaso alguma informação externa seja realmente necessária, deixe isso explícito antes de utilizá-la e explique por que ela é relevante. \nConsidere também o equilíbrio geral da carteira (setores, concentração e risco) ao sugerir compras, reduções ou vendas. \n\nFormato obrigatório da resposta:\n\nDECISÃO: COMPRAR MAIS (+X%) | MANTER (0%) | VENDER (−X%)\nRACIOCÍNIO FINAL:\n(máximo de 5 frases, focadas exclusivamente no longo prazo)\n\nCONDIÇÃO DE MUDANÇA:\n(uma única frase objetiva, baseada em preço ou fundamentos, que faria você mudar essa decisão)\n\nAtualmente, tenho as seguintes ações: ",
+    "gpt_stock_prompt": "Quero que você analise minha ação. Meu estilo de investir é buy and hold, com foco em longo prazo. \nAjustes de posição devem ser sempre graduais, nunca assumindo compra ou venda total, a menos que eu diga explicitamente. \nSe for para comprar mais, indique claramente quanto aumentar da posição atual, usando uma porcentagem objetiva (ex: +5%, +10%, +20%). As porcentagens sempre se referem à posição atual da ação, e não ao capital total da carteira. \nSe for para vender, indique quanto reduzir da posição atual, também em porcentagem. \nSe a melhor decisão for manter, deixe explícito que nenhum ajuste é recomendado no momento. As porcentagens indicadas devem refletir convicção no longo prazo e risco relativo do preço atual frente aos fundamentos. \nEm cenários de queda com bons fundamentos, aceito fazer average down. Quero que você me diga, de forma assertiva e concisa, se devo comprar mais, vender ou manter esta ação no longo prazo, explicando claramente o porquê. \nUsando exclusivamente os dados fornecidos, faça:\n* uma análise fundamentalista, e \n* uma análise técnica estrutural de longo prazo, baseada apenas em preços de fechamento (close) no timeframe informado no campo meta.timeframe, sem assumir dados de abertura, máxima, mínima ou volume. \nCaso alguma informação externa seja necessária, deixe isso explícito antes de usá-la. \n\nFormato obrigatório da resposta:\n\nDECISÃO: COMPRAR MAIS (+X%) | MANTER (0%) | VENDER (−X%)\nRACIOCÍNIO FINAL:\n(máximo de 5 frases, focadas exclusivamente no longo prazo)\n\nCONDIÇÃO DE MUDANÇA:\n(uma única frase objetiva, baseada em preço ou fundamentos, que faria você mudar essa decisão)\n\nAtualmente, tenho as seguintes informações: ",
     "button_update": "To update",
     "button_update_tooltip": "To update in the program the quantities and average prices from a JSON file.",
     "button_save": "Save",
@@ -271,6 +271,7 @@ def plot_1d_complex(
     ylabel="Price",
     ylabel2="Variation",
     enable_crosshair=True,   # 👈 parâmetro novo
+    title=""
 ):
 
     if not prices:
@@ -286,6 +287,8 @@ def plot_1d_complex(
     w = pg.PlotWidget(axisItems={'right': right_axis})
     w.setBackground(bgcolor)
     w.showAxis('right')
+    
+    w.setTitle(title)
 
     plot_item = w.getPlotItem()
     vb = plot_item.getViewBox()
@@ -325,7 +328,6 @@ def plot_1d_complex(
     # --------------------------------------------------
     # CONFIGURAÇÃO DO EIXO X COM 13 TICKS
     # --------------------------------------------------
-    import numpy as np
     x_ticks = np.linspace(x[0], x[-1], 13)  # 13 ticks -> 12 partes
     x_labels = [(pos, f"{int(pos)}") for pos in x_ticks]
     plot_item.getAxis('bottom').setTicks([x_labels])
@@ -350,7 +352,15 @@ def plot_1d_complex(
             movable=False,
             pen=pg.mkPen('gray', style=Qt.DashLine)
         )
+        
+        hline = pg.InfiniteLine(
+            angle=0,
+            movable=False,
+            pen=pg.mkPen('gray', style=Qt.DashLine)
+        )
+        
         plot_item.addItem(vline, ignoreBounds=True)
+        plot_item.addItem(hline, ignoreBounds=True)
 
         label = pg.TextItem("", anchor=(0, 1), color=color)
         plot_item.addItem(label)
@@ -376,7 +386,13 @@ def plot_1d_complex(
             if 0 <= idx < len(x):
                 y_plot = y[idx]
 
+                # v line
                 vline.setPos(x[idx])
+                
+                # h line
+                hline.setPos(y[idx])
+
+                # label
                 label.setText(
                     f"x: {x[idx]}\n"
                     f"{ylabel}: {y_plot:.2f}"
@@ -806,7 +822,8 @@ class StocksViewer(QMainWindow):
                 "version": about.__version__,
                 "generated_at": QDateTime.currentDateTime().toString(Qt.ISODate),
                 "total_initial_amount": round(total_initial, 2),     # ← novo
-                "total_current_amount": round(total_current, 2)      # ← novo
+                "total_current_amount": round(total_current, 2),     # ← novo
+                "timeframe": "1d" 
             },
             "stocks": rich_data
         }
@@ -883,9 +900,8 @@ class StocksViewer(QMainWindow):
             ylabel=CONFIG["plot_ylabel"],
             ylabel2=CONFIG["plot_ylabel2"],
             enable_crosshair=True,   # 👈 parâmetro novo
+            title="Total performance"
         )       
-        
-        plot.setTitle("Total performance")
 
         self.plot_layout.addWidget(plot)
 
@@ -1323,6 +1339,22 @@ class StocksViewer(QMainWindow):
             return
 
         prices = stock_data.get('daysData2y', [])
+        title  = "2y - "+stock_name
+        
+        if len(prices)<=2:
+            new_prices = stock_data.get('daysData6mo', [])
+            new_title  = "6mo - "+stock_name 
+            
+            if len(new_prices)>2:
+                prices = new_prices
+                title = new_title
+            else:
+                new_prices = stock_data.get('daysData1mo', [])
+                new_title  = "1mo - "+stock_name 
+                if len(new_prices)>2:
+                    prices = new_prices
+                    title = new_title
+        
         average_price = stock_data.get('average_price', None)
 
         if not prices or average_price is None:
@@ -1337,9 +1369,9 @@ class StocksViewer(QMainWindow):
             pccolor=pccolor, 
             xlabel=xlabel,
             ylabel=ylabel,
-            ylabel2=ylabel2
+            ylabel2=ylabel2,
+            title=title
         )
-        plot.setTitle("2y - "+stock_name)
 
         self.plot_layout.addWidget(plot)
 
@@ -1403,14 +1435,26 @@ class StocksViewer(QMainWindow):
         
         rich_data = self.sanitize(copy.deepcopy(self.stocks_data[stock_name]) )
         rich_data = self.round_floats(rich_data, ndigits=4)
-        json_str = json.dumps(rich_data, indent=1, ensure_ascii=False)
+        
+        payload = {
+            "meta": {
+                "program": about.__program_name__,
+                "version": about.__version__,
+                "generated_at": QDateTime.currentDateTime().toString(Qt.ISODate),
+                "timeframe": "1d" 
+            },
+            "stocks": {
+                stock_name: rich_data
+            }
+        }
+        
+        json_str = json.dumps(payload, indent=1, ensure_ascii=False)
         
         # Padrão para encontrar arrays de números com quebras de linha
         pattern = r'\[\s*\n\s*((?:[-\d.]+(?:,\s*\n\s*)?)+)\s*\n\s*\]'
         json_str = re.sub(pattern, self.compact_numeric_arrays, json_str)
         
         msg  = CONFIG["gpt_stock_prompt"] + "\n"
-        msg += "\""+stock_name + "\":\n"
         msg += json_str
         
         self.show_annotation_dialog(msg,title=stock_name)
