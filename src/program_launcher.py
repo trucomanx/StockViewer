@@ -17,7 +17,7 @@ pip install -r requirements.txt
 cd src
 
 ## windows ##
-python3 -m PyInstaller --onefile --windowed --name stock_viewer --add-data "stock_viewer/icons;icons" --collect-all PyQt5 program_launcher.py
+python -m PyInstaller --onefile --windowed --name stock_viewer --add-data "stock_viewer/icons;icons" --collect-all PyQt5 program_launcher.py
 
 ## ubuntu ##
 python3 -m PyInstaller --onefile --windowed --name stock_viewer --add-data "stock_viewer/icons:icons" --collect-all PyQt5 program_launcher.py
