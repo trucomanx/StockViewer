@@ -10,7 +10,7 @@ import signal
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QLabel, QComboBox, QTableWidget, QProgressBar, 
     QTableWidgetItem, QWidget, QPushButton, QLineEdit, QFileDialog, QHBoxLayout, 
-    QTabWidget, QFormLayout, QSplitter, QMenu, QSizePolicy,
+    QTabWidget, QFormLayout, QSplitter, QMenu, QSizePolicy, QFrame, QAction, 
     QDialog, QTextEdit, QDialogButtonBox, QVBoxLayout
 )
 
@@ -519,6 +519,115 @@ class StocksViewer(QMainWindow):
         
         widget.setLayout(layout)
         self.setCentralWidget(widget)
+        
+        self._create_toolbar()
+    
+    def _create_toolbar(self):
+        self.toolbar = self.addToolBar("Main")
+        self.toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+
+        # Botão de Atualizar
+        self.update_action = QAction(QIcon.fromTheme("view-refresh"), 
+                                        CONFIG["update_button"], 
+                                        self)
+        self.update_action.setToolTip(CONFIG["update_button_tooltip"])
+        self.update_action.triggered.connect(self.update_data)
+        self.update_action.setEnabled(False)
+        self.toolbar.addAction(self.update_action)
+
+
+        # Botão de Salvar
+        self.save_action = QAction(QIcon.fromTheme("document-save"), 
+                                        CONFIG["button_save"], 
+                                        self)
+        self.save_action.setToolTip(CONFIG["button_save_tooltip"])
+        self.save_action.triggered.connect(self.save_data)
+        self.save_action.setEnabled(False)
+        self.toolbar.addAction(self.save_action)
+
+        # Adicionar o espaçador
+        self.toolbar_spacer = QWidget()
+        self.toolbar_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.toolbar.addWidget(self.toolbar_spacer)
+
+
+        # Botão Save As
+        self.save_as_action = QAction(QIcon.fromTheme("document-save-as"), 
+                                        CONFIG["button_save_as_plus"], 
+                                        self)
+        self.save_as_action.setToolTip(CONFIG["button_save_as_plus_tooltip"])
+        self.save_as_action.triggered.connect(self.save_data_as_plus)
+        self.save_as_action.setEnabled(False)
+        self.toolbar.addAction(self.save_as_action)
+
+        
+        # Botão GPT annot.
+        self.gpt_annot_action = QAction(QIcon.fromTheme("text-x-generic"), 
+                                        CONFIG["button_gpt_annotation"], 
+                                        self)
+        self.gpt_annot_action.setToolTip(CONFIG["button_gpt_annotation_tooltip"])
+        self.gpt_annot_action.triggered.connect(self.gpt_annot_callback)  # texto inicial
+        self.toolbar.addAction(self.gpt_annot_action)
+        
+        
+        # performance
+        self.performance_action = QAction(QIcon.fromTheme("applications-graphics"), 
+                                        CONFIG["button_performance"], 
+                                        self)
+        self.performance_action.setToolTip(CONFIG["button_performance_tooltip"])
+        self.performance_action.triggered.connect(self.on_performance_click)
+        self.performance_action.setEnabled(False)
+        self.toolbar.addAction(self.performance_action)
+
+        # groupplot
+        self.groupplot_action = QAction(QIcon.fromTheme("applications-graphics"), 
+                                        CONFIG["button_groupplot"], 
+                                        self)
+        self.groupplot_action.setToolTip(CONFIG["button_groupplot_tooltip"])
+        self.groupplot_action.triggered.connect(self.on_groupplot_click)
+        self.groupplot_action.setEnabled(False)
+        self.toolbar.addAction(self.groupplot_action)
+
+        
+        # configure
+        self.configure_action = QAction(QIcon.fromTheme("document-properties"), 
+                                        CONFIG["button_prog_configure"], 
+                                        self)
+        self.configure_action.setToolTip(CONFIG["button_prog_configure_tooltip"])
+        self.configure_action.triggered.connect(self.on_configure_click)
+        self.toolbar.addAction(self.configure_action)
+
+                
+        # about
+        self.about_action = QAction(QIcon.fromTheme("help-about"), 
+                                    CONFIG["button_about"], 
+                                    self)
+        self.about_action.setToolTip(CONFIG["button_about_tooltip"])
+        self.about_action.triggered.connect(self.about_data)
+        self.toolbar.addAction(self.about_action)
+       
+
+        # Coffee
+        self.coffee_action = QAction(   QIcon.fromTheme("emblem-favorite"), 
+                                        CONFIG["button_coffee"], 
+                                        self)
+        self.coffee_action.setToolTip(CONFIG["button_coffee_tooltip"])
+        self.coffee_action.triggered.connect(self.on_coffee_click)
+        self.toolbar.addAction(self.coffee_action)
+
+
+        # Conectar ao sinal de mudança de orientação
+        self.toolbar.orientationChanged.connect(self._update_spacer_policy)
+        self._update_spacer_policy()
+
+    def _update_spacer_policy(self):
+        """Atualiza a política do espaçador baseado na orientação da toolbar"""
+        if self.toolbar.orientation() == Qt.Horizontal:
+            # Horizontal: expande na largura
+            self.toolbar_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        else:
+            # Vertical: expande na altura
+            self.toolbar_spacer.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
     def setup_table_tab(self):
         layout = QVBoxLayout()
@@ -540,90 +649,6 @@ class StocksViewer(QMainWindow):
 
         layout.addLayout(stocks_layout)
 
-        #
-        buttons_layout = QHBoxLayout()
-        
-        # Botão de Atualizar
-        self.update_button = QPushButton(CONFIG["update_button"], self)
-        self.update_button.setToolTip(CONFIG["update_button_tooltip"])
-        self.update_button.setIcon(QIcon.fromTheme("view-refresh"))
-        self.update_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.update_button.clicked.connect(self.update_data)
-        buttons_layout.addWidget(self.update_button)
-
-        # Botão de Salvar
-        self.save_button = QPushButton(CONFIG["button_save"], self)
-        self.save_button.setToolTip(CONFIG["button_save_tooltip"])
-        self.save_button.setIcon(QIcon.fromTheme("document-save"))
-        self.save_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.save_button.clicked.connect(self.save_data)
-        buttons_layout.addWidget(self.save_button)
-
-        # Adicionar o espaçador
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        buttons_layout.addWidget(spacer)
-        
-        # Botão Save As
-        self.save_as_button = QPushButton(CONFIG["button_save_as_plus"], self)
-        self.save_as_button.setToolTip(CONFIG["button_save_as_plus_tooltip"])
-        self.save_as_button.setIcon(QIcon.fromTheme("document-save-as"))
-        self.save_as_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.save_as_button.clicked.connect(self.save_data_as_plus)
-        self.save_as_button.setEnabled(False)
-        buttons_layout.addWidget(self.save_as_button)
-
-        # Botão GPT annot.
-        self.gpt_annot_button = QPushButton(CONFIG["button_gpt_annotation"], self)
-        self.gpt_annot_button.setToolTip(CONFIG["button_gpt_annotation_tooltip"])
-        self.gpt_annot_button.setIcon(QIcon.fromTheme("text-x-generic"))  # ícone opcional
-        self.gpt_annot_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.gpt_annot_button.clicked.connect(self.gpt_annot_callback)  # texto inicial
-        buttons_layout.addWidget(self.gpt_annot_button)
-
-        # Group plot
-        self.performance_button = QPushButton(CONFIG["button_performance"], self)
-        self.performance_button.setToolTip(CONFIG["button_performance_tooltip"])
-        self.performance_button.setIcon(QIcon.fromTheme("applications-graphics"))
-        self.performance_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.performance_button.clicked.connect(self.on_performance_click)
-        self.performance_button.setEnabled(False)
-        buttons_layout.addWidget(self.performance_button)
-
-        # Group plot
-        self.groupplot_button = QPushButton(CONFIG["button_groupplot"], self)
-        self.groupplot_button.setToolTip(CONFIG["button_groupplot_tooltip"])
-        self.groupplot_button.setIcon(QIcon.fromTheme("applications-graphics"))
-        self.groupplot_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.groupplot_button.clicked.connect(self.on_groupplot_click)
-        self.groupplot_button.setEnabled(False)
-        buttons_layout.addWidget(self.groupplot_button)
-
-        # Configure
-        self.configure_button = QPushButton(CONFIG["button_prog_configure"], self)
-        self.configure_button.setToolTip(CONFIG["button_prog_configure_tooltip"])
-        self.configure_button.setIcon(QIcon.fromTheme("document-properties"))
-        self.configure_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.configure_button.clicked.connect(self.on_configure_click)
-        buttons_layout.addWidget(self.configure_button)
-
-        # Coffee
-        self.coffee_button = QPushButton(CONFIG["button_coffee"], self)
-        self.coffee_button.setToolTip(CONFIG["button_coffee_tooltip"])
-        self.coffee_button.setIcon(QIcon.fromTheme("emblem-favorite"))
-        self.coffee_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.coffee_button.clicked.connect(self.on_coffee_click)
-        buttons_layout.addWidget(self.coffee_button)
-        
-        # About
-        self.about_button = QPushButton(CONFIG["button_about"], self)
-        self.about_button.setToolTip(CONFIG["button_about_tooltip"])
-        self.about_button.setIcon(QIcon.fromTheme("help-about"))
-        self.about_button.setIconSize(QSize(CONFIG["toolbutton_icon_size"], CONFIG["toolbutton_icon_size"]))
-        self.about_button.clicked.connect(self.about_data)
-        buttons_layout.addWidget(self.about_button)
-
-        layout.addLayout(buttons_layout)
 
         # Label
         self.label = QLabel(CONFIG["select_group"])
@@ -970,6 +995,8 @@ class StocksViewer(QMainWindow):
         if path:
             self.stocks_path_edit.setText(path)
 
+            self.update_action.setEnabled(True)
+            self.save_action.setEnabled(True)
             # ⏳ deixa o Qt fechar e repintar o diálogo primeiro
             QTimer.singleShot(0, self.update_data)
 
@@ -1013,9 +1040,9 @@ class StocksViewer(QMainWindow):
 
         finally:
             self.setEnabled(True)
-            self.groupplot_button.setEnabled(True)
-            self.performance_button.setEnabled(True)
-            self.save_as_button.setEnabled(True)
+            self.groupplot_action.setEnabled(True)
+            self.performance_action.setEnabled(True)
+            self.save_as_action.setEnabled(True)
 
 
     def update_table_columns(self):
