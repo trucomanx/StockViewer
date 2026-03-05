@@ -73,6 +73,14 @@ def get_current_price(stock):
     except Exception:
         pass
 
+    try:
+        hist = price_hist(stock, period="1mo", interval="1d")
+        
+        if len(hist)>0:
+            return float(hist[-1])
+    except Exception:
+        pass
+
     return float("nan")
 
 # ---------------- DIVIDENDS ---------------- #
